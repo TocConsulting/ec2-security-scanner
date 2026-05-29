@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EC2 Security Scanner Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <style>
+        :root {
+            --bg: #0f172a; --card: #1e293b; --border: #334155;
+            --text: #e2e8f0; --text-heading: #f1f5f9; --text-muted: #94a3b8; --text-dim: #64748b;
+            --th-bg: #334155;
+            --hover-bg: #1e293b;
+            --critical: #ef4444; --high: #f97316; --medium: #eab308; --low: #3b82f6; --good: #22c55e; --info: #06b6d4;
+            --badge-critical-bg: #7f1d1d; --badge-critical-fg: #fca5a5;
+            --badge-high-bg: #7c2d12; --badge-high-fg: #fdba74;
+            --badge-medium-bg: #713f12; --badge-medium-fg: #fde047;
+            --badge-low-bg: #1e3a5f; --badge-low-fg: #93c5fd;
+            --badge-good-bg: #14532d; --badge-good-fg: #86efac;
+            --header-gradient: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            --chart-tick: #94a3b8; --chart-grid: #334155;
+            --link: #3b82f6;
+        }
+        [data-theme="light"] {
+            --bg: #f8fafc; --card: #ffffff; --border: #e2e8f0;
+            --text: #1e293b; --text-heading: #0f172a; --text-muted: #64748b; --text-dim: #94a3b8;
+            --th-bg: #f1f5f9;
+            --hover-bg: #f8fafc;
+            --critical: #dc2626; --high: #ea580c; --medium: #ca8a04; --low: #2563eb; --good: #16a34a; --info: #0891b2;
+            --badge-critical-bg: #fef2f2; --badge-critical-fg: #dc2626;
+            --badge-high-bg: #fff7ed; --badge-high-fg: #ea580c;
+            --badge-medium-bg: #fefce8; --badge-medium-fg: #ca8a04;
+            --badge-low-bg: #eff6ff; --badge-low-fg: #2563eb;
+            --badge-good-bg: #f0fdf4; --badge-good-fg: #16a34a;
+            --header-gradient: linear-gradient(135deg, #e2e8f0 0%, #f8fafc 100%);
+            --chart-tick: #64748b; --chart-grid: #e2e8f0;
+            --link: #2563eb;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        h1, h2, h3 { color: var(--text-heading); }
+        .header { background: var(--header-gradient); padding: 30px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--border); }
+        .header h1 { font-size: 28px; margin-bottom: 8px; }
+        .header .meta { color: var(--text-muted); font-size: 14px; }
+        .grid { display: grid; gap: 20px; margin-bottom: 20px; }
+        .grid-4 { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+        .grid-2 { grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); }
+        .card { background: var(--card); border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
+        .card h3 { margin-bottom: 12px; font-size: 16px; color: var(--text-muted); }
+        .stat-value { font-size: 36px; font-weight: 700; }
+        .stat-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+        .critical { color: var(--critical); }
+        .high { color: var(--high); }
+        .medium { color: var(--medium); }
+        .low { color: var(--low); }
+        .good { color: var(--good); }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: var(--th-bg); color: var(--text); padding: 12px 16px; text-align: left; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+        td { padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+        tr:hover td { background: var(--hover-bg); }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+        .badge-critical { background: var(--badge-critical-bg); color: var(--badge-critical-fg); }
+        .badge-high { background: var(--badge-high-bg); color: var(--badge-high-fg); }
+        .badge-medium { background: var(--badge-medium-bg); color: var(--badge-medium-fg); }
+        .badge-low { background: var(--badge-low-bg); color: var(--badge-low-fg); }
+        .badge-good { background: var(--badge-good-bg); color: var(--badge-good-fg); }
+        .score-bar { height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; }
+        .score-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+        .chart-container { position: relative; height: 300px; }
+        .section { margin-bottom: 30px; }
+        .section h2 { font-size: 22px; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+        .footer { text-align: center; color: var(--text-dim); padding: 20px; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <button id="theme-toggle" onclick="toggleTheme()" style="position:fixed;top:16px;right:16px;z-index:1000;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:18px;" title="Toggle dark/light mode">🌙</button>
+            <h1>EC2 Security Scanner Report</h1>
+            <div class="meta">
+                Region: {{ summary.region }} | Account: {{ summary.account_id }} |
+                Scan Time: {{ summary.scan_time | format_datetime }} |
+                Instances: {{ summary.total_instances }}
+            </div>
+        </div>
+
+        <!-- Executive Summary -->
+        <div class="grid grid-4">
+            <div class="card">
+                <div class="stat-label">Total Instances</div>
+                <div class="stat-value">{{ summary.total_instances }}</div>
+            </div>
+            <div class="card">
+                <div class="stat-label">Avg Instance Score</div>
+                <div class="stat-value {% if summary.average_security_score >= 80 %}good{% elif summary.average_security_score >= 60 %}medium{% else %}critical{% endif %}">
+                    {{ "%.1f" | format(summary.average_security_score) }}
+                </div>
+            </div>
+            <div class="card">
+                <div class="stat-label">Environment Score</div>
+                <div class="stat-value {% if summary.environment_security_score >= 80 %}good{% elif summary.environment_security_score >= 60 %}medium{% else %}critical{% endif %}">
+                    {{ summary.environment_security_score }}
+                </div>
+            </div>
+            <div class="card">
+                <div class="stat-label">Public Instances</div>
+                <div class="stat-value {% if summary.public_instances > 0 %}high{% else %}good{% endif %}">
+                    {{ summary.public_instances }}
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-4">
+            <div class="card">
+                <div class="stat-label">Critical Issues</div>
+                <div class="stat-value critical">{{ summary.critical_severity_instances }}</div>
+            </div>
+            <div class="card">
+                <div class="stat-label">Secrets in UserData</div>
+                <div class="stat-value {% if summary.instances_with_secrets > 0 %}critical{% else %}good{% endif %}">
+                    {{ summary.instances_with_secrets }}
+                </div>
+            </div>
+            <div class="card">
+                <div class="stat-label">Unencrypted Volumes</div>
+                <div class="stat-value {% if summary.unencrypted_volume_instances > 0 %}medium{% else %}good{% endif %}">
+                    {{ summary.unencrypted_volume_instances }}
+                </div>
+            </div>
+            <div class="card">
+                <div class="stat-label">Running</div>
+                <div class="stat-value">{{ summary.running_instances }}</div>
+            </div>
+            <div class="card">
+                <div class="stat-label">Stopped</div>
+                <div class="stat-value">{{ summary.stopped_instances }}</div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="grid grid-2">
+            <div class="card">
+                <h3>Score Distribution</h3>
+                <div class="chart-container">
+                    <canvas id="scoreChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Compliance by Framework</h3>
+                <div class="chart-container">
+                    <canvas id="complianceChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-2">
+            <div class="card">
+                <h3>Issue Severity Distribution</h3>
+                <div class="chart-container">
+                    <canvas id="severityChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Compliance Summary</h3>
+                <p style="color:var(--text-muted);margin-bottom:8px;font-size:12px;">
+                    Scan level — account/region-wide controls (GuardDuty, CloudTrail, ...)
+                    are counted once, not per instance.
+                </p>
+                <table>
+                    <thead>
+                        <tr><th>Framework</th><th>Passed</th><th>Rate</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for fw, data in compliance_summary.items() %}
+                        <tr>
+                            <td>{{ fw }}</td>
+                            <td>{{ data.passed_controls }}/{{ data.total_controls }}</td>
+                            <td>{{ data.compliance_percentage }}%</td>
+                            <td>
+                                {% if data.compliance_percentage >= 90 %}
+                                <span class="badge badge-good">Excellent</span>
+                                {% elif data.compliance_percentage >= 75 %}
+                                <span class="badge badge-medium">Good</span>
+                                {% elif data.compliance_percentage >= 50 %}
+                                <span class="badge badge-high">Needs Work</span>
+                                {% else %}
+                                <span class="badge badge-critical">Poor</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Instance Details -->
+        <div class="section">
+            <h2>Instance Details</h2>
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Instance</th>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>State</th>
+                            <th>Score</th>
+                            <th>Issues</th>
+                            <th>IMDSv2</th>
+                            <th>Encrypted</th>
+                            <th>Public IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in results %}
+                        <tr>
+                            <td><code>{{ r.instance_id }}</code></td>
+                            <td>{{ r.name or '-' }}</td>
+                            <td>{{ r.instance_type }}</td>
+                            <td>{{ r.state }}</td>
+                            <td>
+                                {% set score = r.security_score or 0 %}
+                                <span class="{% if score >= 90 %}good{% elif score >= 70 %}medium{% elif score >= 50 %}high{% else %}critical{% endif %}">
+                                    <strong>{{ score }}</strong>
+                                </span>
+                                <div class="score-bar" style="width:80px;margin-top:4px;">
+                                    <div class="score-fill" style="width:{{ score }}%;background:{% if score >= 90 %}#22c55e{% elif score >= 70 %}#eab308{% elif score >= 50 %}#f97316{% else %}#ef4444{% endif %};"></div>
+                                </div>
+                            </td>
+                            <td>{{ r.issue_count }}</td>
+                            <td>
+                                {% if r.imdsv2 and r.imdsv2.enforced %}
+                                <span class="badge badge-good">Yes</span>
+                                {% else %}
+                                <span class="badge badge-high">No</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if r.ebs_encryption and r.ebs_encryption.all_encrypted %}
+                                <span class="badge badge-good">Yes</span>
+                                {% else %}
+                                <span class="badge badge-high">No</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if r.public_ip and r.public_ip.has_public_ip %}
+                                <span class="badge badge-high">{{ r.public_ip.public_ip_address }}</span>
+                                {% else %}
+                                <span class="badge badge-good">None</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Environment Posture -->
+        {% if summary.environment_findings %}
+        <div class="section">
+            <h2>Environment Posture (Account + VPC)</h2>
+            <div class="card">
+                <p style="color:var(--text-muted);margin-bottom:10px;font-size:13px;">
+                    These findings are global to the account/region (or shared by every
+                    instance in a VPC). They are scored once (Environment Score) instead of
+                    being deducted from every instance, so a single account-level gap does
+                    not dominate the per-instance average.
+                </p>
+                <table>
+                    <thead>
+                        <tr><th>Severity</th><th>Finding</th><th>Description</th><th>Recommendation</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for f in summary.environment_findings %}
+                        <tr>
+                            <td><span class="badge badge-{{ f.severity | lower }}">{{ f.severity }}</span></td>
+                            <td>{{ f.issue_type }}</td>
+                            <td>{{ f.description }}</td>
+                            <td>{{ f.recommendation }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Critical Findings -->
+        <div class="section">
+            <h2>Critical & High Findings</h2>
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr><th>Instance</th><th>Severity</th><th>Issue</th><th>Recommendation</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for r in results %}
+                        {% for issue in r.issues %}
+                        {% if issue.severity in ['CRITICAL', 'HIGH'] %}
+                        <tr>
+                            <td><code>{{ r.instance_id }}</code></td>
+                            <td><span class="badge badge-{{ issue.severity | lower }}">{{ issue.severity }}</span></td>
+                            <td>{{ issue.description }}</td>
+                            <td>{{ issue.recommendation }}</td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="footer">
+            Generated by EC2 Security Scanner v1.0.0 | Toc Consulting |
+            <a href="https://github.com/TocConsulting/ec2-security-scanner" style="color:var(--link);">GitHub</a>
+        </div>
+    </div>
+
+    <script>
+        // Score Distribution Chart
+        new Chart(document.getElementById('scoreChart'), {
+            type: 'bar',
+            data: {
+                labels: ['0-20', '21-40', '41-60', '61-80', '81-100'],
+                datasets: [{
+                    label: 'Instances',
+                    data: {{ security_score_distribution }},
+                    backgroundColor: ['#ef4444', '#f97316', '#eab308', '#3b82f6', '#22c55e'],
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                    x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+                }
+            }
+        });
+
+        // Compliance Chart
+        new Chart(document.getElementById('complianceChart'), {
+            type: 'bar',
+            data: {
+                labels: {{ compliance_labels | tojson }},
+                datasets: [{
+                    label: 'Compliance %',
+                    data: {{ compliance_percentages }},
+                    backgroundColor: '#3b82f6',
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { beginAtZero: true, max: 100, ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                    y: { ticks: { color: '#94a3b8', font: { size: 11 } }, grid: { display: false } }
+                }
+            }
+        });
+
+        // Severity Chart
+        new Chart(document.getElementById('severityChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Critical', 'High', 'Medium', 'Low', 'Info'],
+                datasets: [{
+                    data: {{ severity_counts }},
+                    backgroundColor: ['#ef4444', '#f97316', '#eab308', '#3b82f6', '#06b6d4'],
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { color: '#e2e8f0', padding: 12 } }
+                }
+            }
+        });
+    </script>
+    <script>
+    function toggleTheme() {
+        const html = document.documentElement;
+        const current = html.getAttribute('data-theme');
+        const next = current === 'light' ? 'dark' : 'light';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        document.getElementById('theme-toggle').textContent = next === 'light' ? '☀️' : '🌙';
+        updateChartColors();
+    }
+    function getThemeColors() {
+        const style = getComputedStyle(document.documentElement);
+        return {
+            tick: style.getPropertyValue('--chart-tick').trim(),
+            grid: style.getPropertyValue('--chart-grid').trim(),
+            text: style.getPropertyValue('--text').trim()
+        };
+    }
+    function updateChartColors() {
+        const c = getThemeColors();
+        Chart.helpers.each(Chart.instances, (chart) => {
+            if (chart.config.type === 'doughnut' || chart.config.type === 'pie') {
+                chart.options.plugins.legend.labels.color = c.text;
+            }
+            if (chart.options.scales) {
+                Object.values(chart.options.scales).forEach(scale => {
+                    if (scale.ticks) scale.ticks.color = c.tick;
+                    if (scale.grid) scale.grid.color = c.grid;
+                    if (scale.pointLabels) scale.pointLabels.color = c.text;
+                });
+            }
+            chart.update();
+        });
+    }
+    (function() {
+        const saved = localStorage.getItem('theme');
+        if (saved === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+            document.getElementById('theme-toggle').textContent = '☀️';
+        }
+    })();
+    </script>
+</body>
+</html>
