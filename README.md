@@ -14,6 +14,10 @@
 
 A comprehensive, production-ready AWS EC2 security scanner with 46 security checks across 8 categories and compliance mapping for AWS FSBP, CIS, PCI DSS, HIPAA, SOC 2, ISO 27001/27017/27018, GDPR, and NIST SP 800-53 Rev5 (137 controls total). Features multi-threaded scanning, UserData secret detection, and interactive HTML dashboards.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/TocConsulting/ec2-security-scanner/main/assets/demo.gif" alt="EC2 Security Scanner demo" width="100%">
+</p>
+
 ## Key Features
 
 ### **Comprehensive Security Analysis**
