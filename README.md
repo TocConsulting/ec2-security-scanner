@@ -27,7 +27,7 @@ A comprehensive, production-ready AWS EC2 security scanner with 46 security chec
 - **Access Control**: IAM role least-privilege analysis, key pair usage, serial console status, EC2 Instance Connect endpoints
 - **Logging & Monitoring**: CloudTrail, CloudWatch alarms, SSM-managed status, GuardDuty runtime monitoring
 - **Patch & Vulnerability**: SSM patch compliance, AMI age, Amazon Inspector v2 findings
-- **Network Exposure**: Unused EIPs, launch template public IPs, subnet auto-assign, VPC Block Public Access, Transit Gateway auto-accept
+- **Network Exposure**: Unused EIPs, launch template public IPs, subnet auto-assign, VPC Block Public Access, Transit Gateway auto-accept, VPC DHCP custom-DNS (DNS-hijack) detection
 - **Tagging & Inventory**: Required tags, long-stopped instances, unused security groups
 
 ### **Compliance Frameworks**
@@ -159,8 +159,8 @@ Run the scanner using Docker without installing Python dependencies locally.
 # Pull the latest version
 docker pull tarekcheikh/ec2-security-scanner:latest
 
-# Or pull a specific version
-docker pull tarekcheikh/ec2-security-scanner:1.0.0
+# Or pin a specific version (replace X.Y.Z with the release you want)
+docker pull tarekcheikh/ec2-security-scanner:X.Y.Z
 ```
 
 ### Basic Docker Commands
@@ -274,6 +274,8 @@ docker run --rm \
                 "ec2:DescribeTransitGateways",
                 "ec2:DescribeNetworkInterfaces",
                 "ec2:DescribeVpcBlockPublicAccessOptions",
+                "ec2:DescribeVpcs",
+                "ec2:DescribeDhcpOptions",
                 "ec2:DescribeVpnConnections",
                 "ec2:GetEbsEncryptionByDefault",
                 "ec2:GetSerialConsoleAccessStatus",
@@ -318,7 +320,7 @@ docker run --rm \
 | D | Access Control | 4 | IAM roles (admin + wildcard + `NotAction`/`NotResource`), key pairs, serial console, Instance Connect |
 | E | Logging & Monitoring | 4 | CloudTrail, CloudWatch alarms, SSM-managed, GuardDuty EC2 runtime monitoring |
 | F | Patch & Vulnerability | 3 | SSM patch compliance, AMI age, Inspector v2 findings |
-| G | Network Exposure | 5 | Unused EIPs, launch template public IP, subnet auto-assign, VPC BPA, Transit Gateway auto-accept |
+| G | Network Exposure | 6 | Unused EIPs, launch template public IP, subnet auto-assign, VPC BPA, Transit Gateway auto-accept, VPC DHCP custom DNS |
 | H | Tagging & Inventory | 3 | Required tags, stopped instances, unused security groups |
 
 ### Secret Detection in UserData (A.8)
@@ -453,6 +455,7 @@ counted **once** even when several VPCs are affected:
 | VPN not IKEv2-only | -10 | HIGH | account |
 | No VPC flow logs | -10 | MEDIUM | per-VPC |
 | EBS default encryption disabled | -5 | MEDIUM | account |
+| VPC DHCP custom DNS resolver | -5 | MEDIUM | account |
 | Serial console access enabled | -5 | MEDIUM | account |
 | NACL allows admin port access | -5 | MEDIUM | per-VPC |
 | Unused security groups | -2 | MEDIUM | account |

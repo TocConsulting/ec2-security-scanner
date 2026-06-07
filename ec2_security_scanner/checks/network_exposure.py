@@ -120,6 +120,57 @@ class NetworkExposureChecker(BaseChecker):
         except ClientError as e:
             return self.handle_client_error(e, {"blocks_igw": False})
 
+    def check_dhcp_dns(self, region: str) -> Dict[str, Any]:
+        """G.6 - VPC DHCP options should use the default/approved DNS.
+
+        Account/region-level check. A VPC whose DHCP option set points
+        ``domain-name-servers`` at a custom (non-AmazonProvidedDNS) resolver is
+        a DNS-hijack risk: an attacker who can edit DHCP options redirects DNS
+        for every instance in the VPC. This surfaces VPCs with custom DNS for
+        review (a corporate resolver is legitimate; an unexpected one is not).
+        """
+        try:
+            ec2 = self.get_client("ec2", region)
+            vpcs = ec2.describe_vpcs().get("Vpcs", [])
+            cache = {}
+            suspicious = []
+            for v in vpcs:
+                did = v.get("DhcpOptionsId")
+                if not did:
+                    continue
+                if did not in cache:
+                    dns = []
+                    try:
+                        opts = ec2.describe_dhcp_options(
+                            DhcpOptionsIds=[did]
+                        )["DhcpOptions"][0]["DhcpConfigurations"]
+                        for c in opts:
+                            if c.get("Key") == "domain-name-servers":
+                                dns = [
+                                    x.get("Value")
+                                    for x in c.get("Values", [])
+                                ]
+                    except ClientError:
+                        dns = []
+                    cache[did] = dns
+                dns = cache[did]
+                # AmazonProvidedDNS is the safe default; an explicit IP resolver
+                # is custom and worth a look.
+                if dns and any(d != "AmazonProvidedDNS" for d in dns):
+                    suspicious.append({
+                        "vpc_id": v.get("VpcId"),
+                        "dhcp_options_id": did,
+                        "dns": dns,
+                    })
+            return {
+                "custom_dns": bool(suspicious),
+                "suspicious_vpcs": suspicious,
+            }
+        except ClientError as e:
+            return self.handle_client_error(
+                e, {"custom_dns": False, "suspicious_vpcs": []}
+            )
+
     def check_transit_gateway(self, region: str) -> Dict[str, Any]:
         """G.5 - Transit Gateways should not auto-accept VPC attachment requests.
 

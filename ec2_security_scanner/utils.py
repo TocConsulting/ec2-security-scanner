@@ -203,6 +203,8 @@ def calculate_environment_score(
         score -= 10  # HIGH
     if not get("ebs_default_encryption", "enabled"):
         score -= 5   # MEDIUM
+    if get("dhcp_dns", "custom_dns"):
+        score -= 5   # MEDIUM
     if get("serial_console_access", "enabled"):
         score -= 5   # MEDIUM
     if get("unused_eips", "count", 0) > 0:

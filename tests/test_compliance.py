@@ -31,7 +31,7 @@ class TestFrameworkCounts(unittest.TestCase):
     }
     EXPECTED_TOTAL_CONTROLS = 137
     EXPECTED_FRAMEWORK_COUNT = 10
-    EXPECTED_CHECK_METHODS = 46
+    EXPECTED_CHECK_METHODS = 47
 
     def test_framework_count(self):
         checker = ComplianceChecker()

@@ -2,7 +2,7 @@ FROM python:3.11.15-slim-bookworm
 
 LABEL maintainer="Toc Consulting <tarek@tocconsulting.fr>"
 LABEL description="AWS EC2 security scanner with compliance mapping for CIS, PCI-DSS, HIPAA, SOC 2, ISO, GDPR, and NIST"
-LABEL version="1.0.0"
+LABEL version="1.0.1"
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1

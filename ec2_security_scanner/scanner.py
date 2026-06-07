@@ -40,7 +40,7 @@ from .checks.tagging_inventory import TaggingInventoryChecker
 ACCOUNT_CHECK_KEYS = {
     "ebs_default_encryption", "ebs_snapshot_bpa", "public_ami",
     "serial_console", "cloudtrail", "guardduty", "unused_eips",
-    "vpc_bpa", "transit_gateway", "vpn_connections", "unused_sgs",
+    "vpc_bpa", "dhcp_dns", "transit_gateway", "vpn_connections", "unused_sgs",
     # Launch templates are region-level resources (describe_instances does
     # not link an instance to its template), audited once per region.
     "launch_templates", "launch_template_imdsv2",
@@ -335,6 +335,16 @@ class EC2SecurityScanner:
         except Exception as e:
             self.logger.warning(f"VPC BPA check failed: {e}")
             account_results["vpc_bpa"] = {"blocks_igw": False}
+
+        try:
+            account_results["dhcp_dns"] = (
+                self.exposure_checker.check_dhcp_dns(self.region)
+            )
+        except Exception as e:
+            self.logger.warning(f"DHCP DNS check failed: {e}")
+            account_results["dhcp_dns"] = {
+                "custom_dns": False, "suspicious_vpcs": [],
+            }
 
         try:
             account_results["vpn_connections"] = (
@@ -871,6 +881,8 @@ class EC2SecurityScanner:
                 "unused_eips", {"count": 0}),
             "vpc_bpa": account_security.get(
                 "vpc_bpa", {"blocks_igw": False}),
+            "dhcp_dns": account_security.get(
+                "dhcp_dns", {"custom_dns": False, "suspicious_vpcs": []}),
             "transit_gateway": account_security.get(
                 "transit_gateway", {"auto_accept_enabled": False}),
             "vpn_connections": account_security.get(
@@ -1235,6 +1247,15 @@ class EC2SecurityScanner:
             add("HIGH", "VPC_BPA_NOT_ENABLED",
                 "VPC Block Public Access is not blocking IGW traffic.",
                 "Enable VPC Block Public Access")
+
+        if acc("dhcp_dns", "custom_dns"):
+            vpcs = account_security.get("dhcp_dns", {}).get(
+                "suspicious_vpcs", [])
+            add("MEDIUM", "VPC_DHCP_CUSTOM_DNS",
+                "VPC(s) use a custom (non-AmazonProvidedDNS) DHCP DNS resolver, "
+                f"a DNS-hijack risk if unexpected: {vpcs}",
+                "Verify each resolver is trusted and restrict who can call "
+                "ec2:CreateDhcpOptions / ec2:AssociateDhcpOptions")
 
         if not acc("cloudtrail", "enabled"):
             add("HIGH", "NO_CLOUDTRAIL",

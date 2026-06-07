@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 
 from ec2_security_scanner.checks.logging_monitoring import LoggingMonitoringChecker
 from ec2_security_scanner.checks.instance_security import InstanceSecurityChecker
+from ec2_security_scanner.checks.network_exposure import NetworkExposureChecker
 
 
 class TestCloudTrailMultiRegion(unittest.TestCase):
@@ -104,6 +105,43 @@ class TestLaunchTemplateAudit(unittest.TestCase):
         res = self._checker(ec2).check_all_launch_templates("us-east-1")
         self.assertFalse(res["imdsv2_not_enforced"])
         self.assertFalse(res["assigns_public_ip"])
+
+
+class TestDhcpDnsCheck(unittest.TestCase):
+    """G.6 - VPC DHCP custom-DNS (DNS-hijack) detection."""
+
+    def _checker(self, vpcs, dhcp_map):
+        ec2 = MagicMock()
+        ec2.describe_vpcs.return_value = {"Vpcs": vpcs}
+
+        def _describe_dhcp(DhcpOptionsIds):
+            did = DhcpOptionsIds[0]
+            return {"DhcpOptions": [{
+                "DhcpConfigurations": dhcp_map.get(did, [])}]}
+
+        ec2.describe_dhcp_options.side_effect = _describe_dhcp
+        c = NetworkExposureChecker()
+        c.get_client = lambda *a, **k: ec2
+        return c
+
+    def test_custom_dns_flagged(self):
+        c = self._checker(
+            [{"VpcId": "vpc-1", "DhcpOptionsId": "dopt-evil"}],
+            {"dopt-evil": [{"Key": "domain-name-servers",
+                            "Values": [{"Value": "10.6.6.6"}]}]})
+        res = c.check_dhcp_dns("us-east-1")
+        self.assertTrue(res["custom_dns"])
+        self.assertEqual(res["suspicious_vpcs"][0]["vpc_id"], "vpc-1")
+        self.assertIn("10.6.6.6", res["suspicious_vpcs"][0]["dns"])
+
+    def test_amazon_provided_dns_not_flagged(self):
+        c = self._checker(
+            [{"VpcId": "vpc-1", "DhcpOptionsId": "dopt-default"}],
+            {"dopt-default": [{"Key": "domain-name-servers",
+                               "Values": [{"Value": "AmazonProvidedDNS"}]}]})
+        res = c.check_dhcp_dns("us-east-1")
+        self.assertFalse(res["custom_dns"])
+        self.assertEqual(res["suspicious_vpcs"], [])
 
 
 if __name__ == "__main__":
