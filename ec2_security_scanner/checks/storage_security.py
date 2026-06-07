@@ -79,9 +79,14 @@ class StorageSecurityChecker(BaseChecker):
     def check_ebs_snapshot_public(
         self, instance_id: str, region: str
     ) -> Dict[str, Any]:
-        """C.3 - EBS snapshots should not be publicly restorable.
+        """C.3 - EBS snapshots should not be shared.
 
-        Checks snapshots associated with the instance's volumes.
+        Checks snapshots associated with the instance's volumes for two exfil
+        paths: a public snapshot (createVolumePermission Group=all) and a
+        snapshot shared to a specific external account (createVolumePermission
+        UserId). The cross-account share is the quieter path: an attacker with
+        ec2:ModifySnapshotAttribute shares the disk to their own account and
+        restores it at leisure.
         """
         try:
             ec2 = self.get_client("ec2", region)
@@ -103,6 +108,8 @@ class StorageSecurityChecker(BaseChecker):
                 return {
                     "has_public_snapshots": False,
                     "public_snapshot_ids": [],
+                    "has_external_shares": False,
+                    "shared_snapshots": [],
                 }
 
             # Get snapshots for these volumes
@@ -118,6 +125,7 @@ class StorageSecurityChecker(BaseChecker):
                 snapshots.extend(page.get("Snapshots", []))
 
             public_snapshots = []
+            shared_snapshots = []
             for snap in snapshots:
                 try:
                     attr_response = ec2.describe_snapshot_attribute(
@@ -127,21 +135,38 @@ class StorageSecurityChecker(BaseChecker):
                     perms = attr_response.get(
                         "CreateVolumePermissions", []
                     )
+                    is_public = False
+                    accounts = []
                     for perm in perms:
                         if perm.get("Group") == "all":
-                            public_snapshots.append(snap["SnapshotId"])
-                            break
+                            is_public = True
+                        # A UserId in createVolumePermission is, by definition,
+                        # another account: you cannot share a snapshot with
+                        # yourself, so any UserId here is a cross-account share.
+                        elif perm.get("UserId"):
+                            accounts.append(perm["UserId"])
+                    if is_public:
+                        public_snapshots.append(snap["SnapshotId"])
+                    if accounts:
+                        shared_snapshots.append({
+                            "snapshot_id": snap["SnapshotId"],
+                            "accounts": accounts,
+                        })
                 except ClientError:
                     continue
 
             return {
                 "has_public_snapshots": len(public_snapshots) > 0,
                 "public_snapshot_ids": public_snapshots,
+                "has_external_shares": len(shared_snapshots) > 0,
+                "shared_snapshots": shared_snapshots,
             }
         except ClientError as e:
             return self.handle_client_error(e, {
                 "has_public_snapshots": False,
                 "public_snapshot_ids": [],
+                "has_external_shares": False,
+                "shared_snapshots": [],
             })
 
     def check_ebs_backup(

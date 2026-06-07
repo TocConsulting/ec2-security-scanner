@@ -84,6 +84,8 @@ def calculate_security_score(checks: Dict[str, Any]) -> int:
         score -= 25
     if get("ebs_snapshot_public", "has_public_snapshots"):
         score -= 20
+    if get("ebs_snapshot_public", "has_external_shares"):
+        score -= 15  # HIGH: snapshot shared to a specific external account
 
     # === SG ingress exposure: NON-STACKING (take highest penalty only) ===
     # B.2 SSH, B.3 RDP, B.4 high-risk, B.5 remote-admin and B.10 authorized

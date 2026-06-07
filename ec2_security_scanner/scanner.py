@@ -1079,6 +1079,15 @@ class EC2SecurityScanner:
                 f"Public EBS snapshots: {snap.get('public_snapshot_ids', [])}",
                 "Remove public access from EBS snapshots")
 
+        # C.3b Cross-account snapshot shares (quieter exfil path than public)
+        if snap.get("has_external_shares", False):
+            add("HIGH", "EBS_SNAPSHOT_SHARED_EXTERNAL",
+                "EBS snapshots shared with external accounts: "
+                f"{snap.get('shared_snapshots', [])}",
+                "Remove the cross-account createVolumePermission "
+                "(ec2:ModifySnapshotAttribute) unless the account is trusted, "
+                "and encrypt snapshots with a CMK the other account cannot use")
+
         # C.4 Backup
         if not checks.get("ebs_backup", {}).get("covered", False):
             add("LOW", "NO_EBS_BACKUP",

@@ -23,7 +23,7 @@ A comprehensive, production-ready AWS EC2 security scanner with 46 security chec
 ### **Comprehensive Security Analysis**
 - **Instance Security**: IMDSv2 enforcement, public IP detection, IAM profile validation, UserData secret scanning
 - **Network Security**: Security group analysis (SSH, RDP, high-risk ports, egress, authorized ports), VPC flow logs, NACLs, VPN IKEv2 enforcement
-- **Storage Security**: EBS encryption (per-volume and account default), public snapshots, public AMIs, backup coverage, EBS snapshot Block Public Access
+- **Storage Security**: EBS encryption (per-volume and account default), public and cross-account-shared snapshots, public AMIs, backup coverage, EBS snapshot Block Public Access
 - **Access Control**: IAM role least-privilege analysis, key pair usage, serial console status, EC2 Instance Connect endpoints
 - **Logging & Monitoring**: CloudTrail, CloudWatch alarms, SSM-managed status, GuardDuty runtime monitoring
 - **Patch & Vulnerability**: SSM patch compliance, AMI age, Amazon Inspector v2 findings
@@ -408,6 +408,7 @@ Each instance starts at **100 points** and loses points for instance-specific is
 |----------------|-----------------|----------|
 | UserData secrets exposed | -25 | CRITICAL |
 | Public EBS snapshots (of this instance's volumes) | -20 | CRITICAL |
+| EBS snapshots shared with an external account | -15 | HIGH |
 | High-risk ports open (non-stacking) | -20 | CRITICAL |
 | SSH open to world (non-stacking) | -15 | HIGH |
 | RDP open to world (non-stacking) | -15 | HIGH |

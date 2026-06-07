@@ -131,5 +131,50 @@ class TestPublicAMI(unittest.TestCase):
         self.assertIn("ami-2", result["public_ami_ids"])
 
 
+class TestSnapshotSharing(unittest.TestCase):
+    """Test C.3 - public and cross-account EBS snapshot sharing."""
+
+    def _checker(self, snapshots, perms):
+        mock_ec2 = Mock()
+
+        def _get_paginator(name):
+            p = Mock()
+            if name == "describe_volumes":
+                p.paginate.return_value = iter(
+                    [{"Volumes": [{"VolumeId": "vol-1"}]}])
+            else:  # describe_snapshots
+                p.paginate.return_value = iter([{"Snapshots": snapshots}])
+            return p
+
+        mock_ec2.get_paginator.side_effect = _get_paginator
+        mock_ec2.describe_snapshot_attribute.return_value = {
+            "CreateVolumePermissions": perms}
+        mock_session = Mock()
+        mock_session.client.return_value = mock_ec2
+        return StorageSecurityChecker(lambda: mock_session)
+
+    def test_cross_account_share_flagged(self):
+        checker = self._checker(
+            [{"SnapshotId": "snap-1"}], [{"UserId": "999999999999"}])
+        result = checker.check_ebs_snapshot_public("i-1", "us-east-1")
+        self.assertTrue(result["has_external_shares"])
+        self.assertFalse(result["has_public_snapshots"])
+        self.assertEqual(
+            result["shared_snapshots"][0]["accounts"], ["999999999999"])
+
+    def test_public_snapshot_still_flagged(self):
+        checker = self._checker(
+            [{"SnapshotId": "snap-1"}], [{"Group": "all"}])
+        result = checker.check_ebs_snapshot_public("i-1", "us-east-1")
+        self.assertTrue(result["has_public_snapshots"])
+        self.assertFalse(result["has_external_shares"])
+
+    def test_unshared_snapshot_clean(self):
+        checker = self._checker([{"SnapshotId": "snap-1"}], [])
+        result = checker.check_ebs_snapshot_public("i-1", "us-east-1")
+        self.assertFalse(result["has_external_shares"])
+        self.assertFalse(result["has_public_snapshots"])
+
+
 if __name__ == "__main__":
     unittest.main()
