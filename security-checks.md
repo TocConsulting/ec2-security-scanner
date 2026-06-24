@@ -1393,7 +1393,7 @@ posture is not multiplied across every instance:
 - **Environment Score** — account/VPC-wide findings, scored **once** per scan.
 
 **Non-stacking rule:** All security-group **ingress exposure** checks (B.2 SSH,
-B.3 RDP, B.4 high-risk ports, B.5 remote admin, B.10 unauthorized ports) describe
+B.3 RDP, B.4 high-risk ports, B.5 remote admin, B.7 unauthorized ports) describe
 the same underlying "ports open to 0.0.0.0/0" misconfiguration, so only the
 **highest single SG penalty** is applied — never the sum.
 
