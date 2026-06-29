@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/TocConsulting/ec2-security-scanner/main/assets/logo.png" alt="EC2 Security Scanner" style="max-width: 100%; height: auto;">
+  <img src="https://raw.githubusercontent.com/TocConsulting/ec2-security-scanner/main/assets/logo.png" alt="ec2-security-scanner" width="320" style="height: auto;">
 </p>
 
 <p align="center">
