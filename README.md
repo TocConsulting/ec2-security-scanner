@@ -8,7 +8,7 @@
   <a href="https://hub.docker.com/r/tarekcheikh/ec2-security-scanner"><img src="https://img.shields.io/docker/v/tarekcheikh/ec2-security-scanner?label=docker&logo=docker" alt="Docker"></a>
   <a href="https://hub.docker.com/r/tarekcheikh/ec2-security-scanner"><img src="https://img.shields.io/docker/pulls/tarekcheikh/ec2-security-scanner" alt="Docker Pulls"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-brightgreen.svg" alt="License: MIT"></a>
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python"></a>
   <a href="https://aws.amazon.com/ec2/"><img src="https://img.shields.io/badge/AWS-EC2-orange.svg" alt="AWS"></a>
 </p>
 
@@ -238,7 +238,7 @@ docker run --rm \
 ## Prerequisites
 
 ### Python Requirements
-- Python 3.10 or higher
+- Python 3.11 or higher
 - Required packages (installed automatically):
   - `boto3>=1.34.0`
   - `botocore>=1.34.0`
